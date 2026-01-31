@@ -39,10 +39,14 @@ While this model has worked for years, it has one main limitation: **incomplete 
 
 ## Specification
 
-A key observation is that `applySignal` both identifies which parts of the state need to change and applies those changes. We can separate these concerns:
+A key observation is that applySignal can produce both parts: the new state and the changes that can be applied to the initial state to get the same final state:
 ```haskell
-findDiffs  :: State -> Signal -> [Diff]
+applySignal  :: State -> Signal -> ([Diff], State)
 applyDiffs :: State -> [Diff] -> State
+```
+Where this property holds:
+```haskell
+let (diff, s1) = applySignal s0 signal in applyDiff s0 diff == s1
 ```
 Diffs describe every change caused by a Signal, down to specific state components.
 With Diffs, DBSync could maintain accurate, real-time ("live") views of ledger structures.
@@ -50,7 +54,9 @@ With Diffs, DBSync could maintain accurate, real-time ("live") views of ledger s
 ### Structure of the Diffs
 
 A Diff is a formalized, serializable description of all state changes that occur when applying a Signal to a given State. It should be annotated by the part of the state that changes and by the specific delta.
-Unlike existing ledger events, Diffs don't need to be annotated by the ledger rule where they came from. They can be represented as a large sum type of all possible changes, where each part corresponds to one leaf of the ledger state tree structure.
+Unlike existing ledger events, Diffs don't need to be annotated by the ledger rule where they came from.
+
+Below we give an example of how Diffs might be implemented: as a large sum type enumerating all possible changes. Each constructor corresponds to a leaf in the ledger state tree. This example is included only to illustrate the intended shape and the properties expected of Diffs. The concrete implementation may differ, as long as those properties continue to hold.
 
 ```haskell
 data Diff era =
@@ -152,7 +158,6 @@ For example, given a tx, its `DUTxO` Diff, or a new vote addition is quite strai
 
 Triggers
 - reduce the complexity and surface area required in the core ledger libraries (see Path to Active below)
-- can be used to derive full Diffs in a separate package (e.g. ledger-indexer-api).
 - provide a compact representation suitable for storage or transmission (see mini-protocol extension below)
 
 ### Extending the mini-protocol (optional)
@@ -193,7 +198,7 @@ In a way, Diffs resemble a double-entry bookeeping system, they make it straight
 
 Steps to be taken are
 - Define `Triggers` in existing ledger packages
-- Define `Diff` types and `createDiffs` in a separate package (e.g. `ledger-indexer-api`) that does not need to be a node dependency.
+- Define `Diff` types and `createDiffs`
 - As a first step, support only the latest era (Conway currently).
 - Ιntegrate with an indexer (e.g. DBSync) for evaluation.
 
